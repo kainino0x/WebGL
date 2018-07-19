@@ -64,6 +64,27 @@ gl.bufferData(gl.UNIFORM_BUFFER, 8, gl.STATIC_DRAW);
 
 const dest = new Uint8Array(8);
 
+(function() {
+    var timeouts = [];
+    var messageName = "zero-timeout-message";
+
+    function handleMessage(event) {
+        if (event.source == window && event.data == messageName) {
+            event.stopPropagation();
+            if (timeouts.length > 0) {
+                var fn = timeouts.shift();
+                fn();
+            }
+        }
+    }
+    window.addEventListener("message", handleMessage, true);
+
+    window.setZeroTimeout = fn => {
+        timeouts.push(fn);
+        window.postMessage(messageName, "*");
+    };
+})();
+
 // Makes a new "resolvable" Promise
 function resolvable() {
     let resolve;
@@ -83,10 +104,10 @@ function fence() {
             gl.deleteSync(sync);
             promise.resolve();
         } else {
-            setTimeout(check, 0);
+            setZeroTimeout(check);
         }
     }
-    setTimeout(check, 0);
+    setZeroTimeout(check);
 
     return promise;
 }
@@ -104,12 +125,12 @@ function timedGetBufferSubData() {
 
 function timeBlockingReadback() {
     const promise = resolvable();
-    setTimeout(() => {
+    setZeroTimeout(() => {
         writeToReadbackBuffer();
         const tBlocking = timedGetBufferSubData();
         const tLatency = tBlocking;
         promise.resolve({latency: tLatency, blocking: tBlocking});
-    }, 0);
+    });
     return promise;
 }
 
